@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
-import { classifyIdentifier, generateInviteCode, generateReference } from "@/lib/ids";
+import { classifyIdentifier, isEmail, normalizePhone, generateInviteCode, generateReference } from "@/lib/ids";
 import { createSession } from "@/lib/auth";
 import { ensureSeed } from "@/lib/seed";
 
@@ -11,11 +11,102 @@ export async function POST(req: Request) {
   try {
     await ensureSeed();
     const body = await req.json();
-    const identifier = String(body.identifier ?? "");
     const password = String(body.password ?? "");
     const confirmPassword = String(body.confirmPassword ?? "");
     const referral = String(body.referral ?? "").trim().toUpperCase();
 
+    // ---- New multi-field registration (Full name / Phone / Email) ----
+    const hasFullName = "fullName" in body;
+    if (hasFullName) {
+      const fullName = String(body.fullName ?? "").trim();
+      const emailRaw = String(body.email ?? "").trim().toLowerCase();
+      const phoneRaw = String(body.phone ?? "").trim();
+
+      if (fullName.length < 2) {
+        return NextResponse.json({ error: "Enter your full name.", code: "NAME" }, { status: 400 });
+      }
+      if (!isEmail(emailRaw)) {
+        return NextResponse.json(
+          { error: "Enter a valid email address — you will use it to log in.", code: "EMAIL" },
+          { status: 400 }
+        );
+      }
+      const phone = normalizePhone(phoneRaw);
+      if (!phone) {
+        return NextResponse.json(
+          { error: "Enter a valid Kenyan phone number (07XX / 01XX XXX XXX).", code: "PHONE" },
+          { status: 400 }
+        );
+      }
+      if (password.length < 6) {
+        return NextResponse.json(
+          { error: "Password must be at least 6 characters.", code: "PASSWORD" },
+          { status: 400 }
+        );
+      }
+      if (password !== confirmPassword) {
+        return NextResponse.json({ error: "Passwords do not match.", code: "PASSWORD" }, { status: 400 });
+      }
+
+      const emailTaken = await db.user.findUnique({ where: { email: emailRaw } });
+      if (emailTaken) {
+        return NextResponse.json(
+          { error: "That email is already registered. Log in instead.", code: "EMAIL_TAKEN" },
+          { status: 409 }
+        );
+      }
+      const phoneTaken = await db.user.findUnique({ where: { phone } });
+      if (phoneTaken) {
+        return NextResponse.json(
+          { error: "That phone number is already registered. Log in instead.", code: "PHONE_TAKEN" },
+          { status: 409 }
+        );
+      }
+
+      const referrer = await resolveReferral(referral);
+      if (referrer.error) {
+        return NextResponse.json({ error: referrer.error }, { status: 400 });
+      }
+
+      let inviteCode = generateInviteCode();
+      while (await db.user.findUnique({ where: { inviteCode } })) {
+        inviteCode = generateInviteCode();
+      }
+
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      const user = await db.$transaction(async (tx) => {
+        const created = await tx.user.create({
+          data: {
+            email: emailRaw,
+            phone,
+            passwordHash,
+            displayName: fullName,
+            inviteCode,
+            referredById: referrer.id,
+            mpesaPhone: phone,
+            balance: SIGNUP_BONUS,
+          },
+        });
+        await tx.transaction.create({
+          data: {
+            userId: created.id,
+            type: "BONUS",
+            amount: SIGNUP_BONUS,
+            status: "COMPLETED",
+            reference: generateReference("BONUS"),
+            description: "Sign-up bonus credited",
+          },
+        });
+        return created;
+      });
+
+      await createSession(user.id);
+      return NextResponse.json({ ok: true });
+    }
+
+    // ---- Legacy single-identifier registration (kept for compatibility) ----
+    const identifier = String(body.identifier ?? "");
     const { kind, value } = classifyIdentifier(identifier);
     if (kind === "invalid") {
       return NextResponse.json(
@@ -24,10 +115,7 @@ export async function POST(req: Request) {
       );
     }
     if (password.length < 6) {
-      return NextResponse.json(
-        { error: "Password must be at least 6 characters." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
     }
     if (password !== confirmPassword) {
       return NextResponse.json({ error: "Passwords do not match." }, { status: 400 });
@@ -44,23 +132,14 @@ export async function POST(req: Request) {
       );
     }
 
-    // Resolve optional referral code → referrer chain (max 3 levels)
-    let referrerId: string | null = null;
-    if (referral) {
-      const referrer = await db.user.findUnique({ where: { inviteCode: referral } });
-      if (!referrer) {
-        return NextResponse.json(
-          { error: "Invite code not recognised. Leave it blank or check the code." },
-          { status: 400 }
-        );
-      }
-      referrerId = referrer.id;
+    const referrer = await resolveReferral(referral);
+    if (referrer.error) {
+      return NextResponse.json({ error: referrer.error }, { status: 400 });
     }
 
     const displayName =
       kind === "email" ? value.split("@")[0] : `member${value.slice(-4)}`;
 
-    // Ensure unique invite code
     let inviteCode = generateInviteCode();
     while (await db.user.findUnique({ where: { inviteCode } })) {
       inviteCode = generateInviteCode();
@@ -76,12 +155,11 @@ export async function POST(req: Request) {
           passwordHash,
           displayName,
           inviteCode,
-          referredById: referrerId,
+          referredById: referrer.id,
           mpesaPhone: kind === "phone" ? value : "",
           balance: SIGNUP_BONUS,
         },
       });
-
       await tx.transaction.create({
         data: {
           userId: created.id,
@@ -92,7 +170,6 @@ export async function POST(req: Request) {
           description: "Sign-up bonus credited",
         },
       });
-
       return created;
     });
 
@@ -102,6 +179,17 @@ export async function POST(req: Request) {
     console.error("register error", e);
     return NextResponse.json({ error: "Could not create your account." }, { status: 500 });
   }
+}
+
+async function resolveReferral(
+  referral: string
+): Promise<{ id: string | null; error?: string }> {
+  if (!referral) return { id: null };
+  const referrer = await db.user.findUnique({ where: { inviteCode: referral } });
+  if (!referrer) {
+    return { id: null, error: "Invite code not recognised. Leave it blank or check the code." };
+  }
+  return { id: referrer.id };
 }
 
 // Users registering with email still need a registered M-Pesa number

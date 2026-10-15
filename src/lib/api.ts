@@ -99,7 +99,11 @@ export type CouponDTO = {
 async function handle<T>(res: Response): Promise<T> {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error((data as { error?: string }).error ?? `Request failed (${res.status})`);
+    const err = new Error(
+      (data as { error?: string }).error ?? `Request failed (${res.status})`
+    ) as Error & { code?: string };
+    err.code = (data as { code?: string }).code;
+    throw err;
   }
   return data as T;
 }
@@ -112,11 +116,38 @@ export const api = {
       body: JSON.stringify({ identifier }),
     }).then(handle<{ exists: boolean; kind: string }>),
 
-  register: (payload: { identifier: string; password: string; confirmPassword: string; referral?: string }) =>
+  register: (payload: {
+    identifier?: string;
+    fullName?: string;
+    email?: string;
+    phone?: string;
+    password: string;
+    confirmPassword: string;
+    referral?: string;
+  }) =>
     fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+    }).then(handle<{ ok: boolean }>),
+
+  forgotStart: (identifier: string) =>
+    fetch("/api/auth/forgot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "start", identifier }),
+    }).then(handle<{ ok: boolean; maskedPhone: string }>),
+
+  forgotReset: (payload: {
+    identifier: string;
+    phone: string;
+    newPassword: string;
+    confirmPassword: string;
+  }) =>
+    fetch("/api/auth/forgot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "reset", ...payload }),
     }).then(handle<{ ok: boolean }>),
 
   login: (payload: { identifier: string; password: string }) =>

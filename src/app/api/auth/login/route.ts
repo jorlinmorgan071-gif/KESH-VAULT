@@ -26,12 +26,18 @@ export async function POST(req: Request) {
         : await db.user.findUnique({ where: { phone: value } });
 
     if (!user) {
-      return NextResponse.json({ error: "No account found for this email or phone." }, { status: 404 });
+      return NextResponse.json(
+        { error: "No account found for this email or phone.", code: "NO_ACCOUNT" },
+        { status: 404 }
+      );
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
-      return NextResponse.json({ error: "Incorrect password. Try again." }, { status: 401 });
+      return NextResponse.json(
+        { error: "Incorrect password. Try again.", code: "BAD_PASSWORD" },
+        { status: 401 }
+      );
     }
 
     await createSession(user.id);

@@ -256,6 +256,134 @@ body {
   display: none;
 }
 
+/* ---------- Auth screens (login / register / forgot) ---------- */
+
+.auth-logo-tile {
+  background: linear-gradient(160deg, #ef2d3f 0%, #dc2626 48%, #b31525 100%);
+  border-radius: 1.375rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.25),
+    0 20px 44px -16px rgba(220, 38, 38, 0.6);
+  position: relative;
+  overflow: hidden;
+}
+
+/* glossy sweep across the logo tile */
+.auth-logo-tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 42%,
+    rgba(255, 255, 255, 0.22) 50%,
+    rgba(255, 255, 255, 0.05) 55%,
+    transparent 62%
+  );
+  transform: translateX(-130%);
+  animation: logo-sheen 4.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes logo-sheen {
+  0% { transform: translateX(-130%); }
+  60% { transform: translateX(130%); }
+  100% { transform: translateX(130%); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.auth-card {
+  background: linear-gradient(180deg, #1b1c21 0%, #131419 100%);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 1rem;
+  box-shadow: 0 28px 56px -28px rgba(0, 0, 0, 0.85);
+}
+
+.auth-google {
+  background: #212228;
+  border: 1px solid #35363d;
+  border-radius: 0.75rem;
+  transition: background 0.22s ease, border-color 0.22s ease, transform 0.18s ease;
+}
+
+.auth-google:hover:not(:disabled) {
+  background: #27282f;
+  border-color: #43444c;
+}
+
+.auth-google:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.auth-divider-line {
+  height: 1px;
+  flex: 1 1 0%;
+  background: linear-gradient(90deg, transparent, #33343a 30%, #33343a 70%, transparent);
+}
+
+.auth-field {
+  background: #26272c;
+  border: 1px solid #3a3b42;
+  border-radius: 0.75rem;
+  color: #fff;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+
+.auth-field:focus {
+  outline: none;
+  border-color: rgba(226, 29, 46, 0.75);
+  box-shadow: 0 0 0 3px rgba(226, 29, 46, 0.14);
+  background: #2a2b31;
+}
+
+.auth-field::placeholder {
+  color: #9ca3af;
+}
+
+.auth-field-error {
+  border-color: rgba(239, 68, 68, 0.8) !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12) !important;
+}
+
+.auth-btn {
+  background: linear-gradient(180deg, #e62b3c 0%, #dc2626 52%, #b81d28 100%);
+  color: #fff;
+  border-radius: 0.75rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.26),
+    0 12px 30px -10px rgba(220, 38, 38, 0.65);
+  transition: box-shadow 0.25s ease, filter 0.25s ease;
+}
+
+.auth-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    0 16px 38px -10px rgba(220, 38, 38, 0.8);
+}
+
+.auth-btn:disabled {
+  background: linear-gradient(180deg, #2a2b31 0%, #202126 100%);
+  color: #6b7078;
+  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: not-allowed;
+}
+
+/* red link style used for "Forgot password?", "Create one", "Log in" */
+.auth-link {
+  color: #ef4444;
+  transition: color 0.2s ease, opacity 0.2s ease;
+}
+
+.auth-link:hover {
+  color: #f87171;
+}
+
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
