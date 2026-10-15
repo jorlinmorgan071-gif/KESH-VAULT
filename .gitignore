@@ -1,0 +1,39 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# testing
+coverage/
+
+# next.js
+.next/
+out/
+build/
+
+# production
+*.tsbuildinfo
+next-env.d.ts
+
+# misc
+.DS_Store
+*.pem
+*.log
+dev.log
+server.log
+
+# environment — never commit secrets
+.env
+.env.local
+.env*.local
+
+# database (local SQLite)
+db/*.db
+db/*.db-journal
+
+# editor
+.vscode/
+.idea/
+
+# vercel
+.vercel/

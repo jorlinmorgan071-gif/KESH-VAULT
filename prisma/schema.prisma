@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String?  @unique
+  phone        String   @unique
+  passwordHash String
+  displayName  String
+  inviteCode   String   @unique
+  referredById String?
+  referrer     User?    @relation("Referrals", fields: [referredById], references: [id])
+  referrals    User[]   @relation("Referrals")
+  balance      Float    @default(0)
+  mpesaPhone   String
+  welcomeSeen  Boolean  @default(false)
+  guideSeen    Boolean  @default(false)
+  lastCheckIn  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  orders       Order[]
+  transactions Transaction[]
+  coupons      Coupon[]
+}
+
+model Package {
+  id           String  @id
+  name         String
+  image        String
+  durationDays Int
+  dailyReturn  Float
+  stake        Float
+  totalReturn  Float
+  limitPerUser Int
+  sortOrder    Int
+  active       Boolean @default(true)
+}
+
+model Order {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  packageId    String
+  packageName  String
+  packageImage String
+  stakePaid    Float
+  dailyReturn  Float
+  durationDays Int
+  totalReturn  Float
+  status       String   @default("ACTIVE") // ACTIVE | EXPIRED
+  activatedAt  DateTime @default(now())
+  expiresAt    DateTime
+  totalPaidOut Float    @default(0)
+  createdAt    DateTime @default(now())
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  type        String // BONUS | RECHARGE | WITHDRAW | PACKAGE | DAILY | REFERRAL | CHECKIN | GIFT
+  amount      Float // signed: positive credit, negative debit
+  status      String   @default("COMPLETED") // COMPLETED | PENDING | PROCESSING
+  reference   String
+  description String
+  createdAt   DateTime @default(now())
+}
+
+model Coupon {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  code      String
+  amount    Float
+  status    String   @default("VALID") // VALID | REDEEMED | EXPIRED
+  createdAt DateTime @default(now())
+}
+
+model GiftCode {
+  id       String   @id @default(uuid())
+  code     String   @unique
+  amount   Float
+  active   Boolean  @default(true)
+  note     String?
+  uses     Int      @default(0)
+}
